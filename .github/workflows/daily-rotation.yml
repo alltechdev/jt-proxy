@@ -23,104 +23,52 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Get previous worker name
-        id: previous
-        run: |
-          # Extract previous worker name from wrangler.toml
-          PREV_NAME=$(grep "name = " wrangler.toml | sed 's/name = "\(.*\)-proxy"/\1/' || echo "")
-          echo "previous=$PREV_NAME" >> "$GITHUB_OUTPUT"
-          if [ -n "$PREV_NAME" ]; then
-            echo "Previous worker: $PREV_NAME-proxy"
-          else
-            echo "No previous worker found"
-          fi
+      - name: Install dependencies
+        run: npm install
 
       - name: Generate random worker name
         id: random
         run: |
-          # Generate timestamp-based unique name
-          TIMESTAMP=$(date +%s)
-          WORKER_NAME="${TIMESTAMP: -8}"
-          echo "Generated worker name: $WORKER_NAME"
-          {
-            echo "name=$WORKER_NAME"
-          } >> "$GITHUB_OUTPUT"
+          # Generate simple unique name
+          NAME=$(date +%s | tail -c 9)
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          echo "Generated name: $NAME"
 
-      - name: Update wrangler.toml with new name
+      - name: Update wrangler.toml
         run: |
-          echo "Updating worker name to: ${{ steps.random.outputs.name }}-proxy"
-          sed -i "s/name = \".*\"/name = \"${{ steps.random.outputs.name }}-proxy\"/" wrangler.toml
+          # Update worker name
+          sed -i "s/name = .*/name = \"${{ steps.random.outputs.name }}-proxy\"/" wrangler.toml
           echo "Updated wrangler.toml:"
           cat wrangler.toml
 
-      - name: Install dependencies
-        run: npm install
-
-      - name: Deploy new worker
+      - name: Deploy worker
+        run: |
+          # Set API token
+          npx wrangler auth login --api-token "${{ secrets.CLOUDFLARE_API_TOKEN }}"
+          # Deploy
+          npx wrangler deploy
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        run: npx wrangler deploy --compatibility-date 2024-01-01
 
-      - name: Delete previous worker
-        if: steps.previous.outputs.previous != ''
+      - name: Update files and push
         run: |
-          PREV_WORKER="${{ steps.previous.outputs.previous }}-proxy"
-          echo "Deleting previous worker: $PREV_WORKER"
-          npx wrangler delete "$PREV_WORKER" || echo "Failed to delete previous worker (may not exist)"
+          # Create current URL file
+          WORKER_URL="https://${{ steps.random.outputs.name }}-proxy.abesternheim.workers.dev"
+          echo "# Current Worker URL" > CURRENT_URL.md
+          echo "**Today's URL:** $WORKER_URL" >> CURRENT_URL.md
+          echo "**Deployed:** $(date -u)" >> CURRENT_URL.md
 
-      - name: Get deployed worker URL
-        id: worker-url
-        run: |
-          if [ -n "${{ secrets.CUSTOM_DOMAIN }}" ]; then
-            WORKER_URL="https://${{ steps.random.outputs.name }}.${{ secrets.CUSTOM_DOMAIN }}"
-          else
-            WORKER_URL="https://${{ steps.random.outputs.name }}-proxy.abesternheim.workers.dev"
-          fi
-          echo "url=$WORKER_URL" >> "$GITHUB_OUTPUT"
-          echo "Worker deployed at: $WORKER_URL"
-
-      - name: Update daily URL file
-        run: |
-          echo "# Current Daily Worker URL" > CURRENT_URL.md
-          echo "Today's worker URL: ${{ steps.worker-url.outputs.url }}" >> CURRENT_URL.md
-          echo "Deployed at: $(date -u)" >> CURRENT_URL.md
-          echo "" >> CURRENT_URL.md
-          echo "This URL will be updated daily at midnight UTC." >> CURRENT_URL.md
-
-      - name: Update README with current URL
-        run: |
-          # Update README.md with the current URL
+          # Update README
           sed -i '/## Current URL/,/<!-- CURRENT_URL_MARKER -->/c\
           ## Current URL\
           \
-          **Today's active URL:** [${{ steps.worker-url.outputs.url }}](${{ steps.worker-url.outputs.url }})\
+          **Today's active URL:** ['"$WORKER_URL"']('"$WORKER_URL"')\
           \
           <!-- CURRENT_URL_MARKER -->' README.md
-          echo "Updated README with new URL"
 
-      - name: Commit and push changes
-        run: |
+          # Commit and push
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git add wrangler.toml CURRENT_URL.md README.md
-          git diff --staged --quiet || git commit -m "🔄 Daily worker rotation: ${{ steps.random.outputs.name }}-proxy"
+          git commit -m "Daily rotation: ${{ steps.random.outputs.name }}-proxy" || echo "No changes to commit"
           git push
-
-      - name: Create GitHub Release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: "daily-${{ steps.random.outputs.name }}"
-          release_name: "Daily Worker: ${{ steps.random.outputs.name }}-proxy"
-          body: |
-            🔄 **Daily Worker Rotation**
-
-            **New URL:** ${{ steps.worker-url.outputs.url }}
-            **Worker Name:** ${{ steps.random.outputs.name }}-proxy
-            **Deployed:** $(date -u)
-
-            This worker proxies to forums.jtechforums.org with automatic domain rewriting.
-            The URL will be updated again tomorrow at midnight UTC.
-          draft: false
-          prerelease: false
