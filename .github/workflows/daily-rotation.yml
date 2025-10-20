@@ -28,7 +28,7 @@ jobs:
         run: |
           # Generate a random 8-character name
           NEW_NAME=$(cat /dev/urandom | tr -dc 'a-z0-9' | fold -w 8 | head -n 1)
-          echo "name=$NEW_NAME" >> $GITHUB_OUTPUT
+          echo "name=$NEW_NAME" >> "$GITHUB_OUTPUT"
           echo "Generated worker name: $NEW_NAME"
 
       - name: Update wrangler.toml with new name
@@ -42,7 +42,7 @@ jobs:
 
       - name: Authenticate with Cloudflare
         run: |
-          echo "${{ secrets.CLOUDFLARE_API_TOKEN }}" | npx wrangler auth login --api-token
+          npx wrangler auth login --api-token "${{ secrets.CLOUDFLARE_API_TOKEN }}"
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
 
@@ -51,7 +51,7 @@ jobs:
         run: |
           # Extract previous worker name from wrangler.toml
           PREV_NAME=$(grep "name = " wrangler.toml | sed 's/name = "\(.*\)-proxy"/\1/' || echo "")
-          echo "previous=$PREV_NAME" >> $GITHUB_OUTPUT
+          echo "previous=$PREV_NAME" >> "$GITHUB_OUTPUT"
           if [ -n "$PREV_NAME" ]; then
             echo "Previous worker: $PREV_NAME-proxy"
           else
@@ -76,7 +76,7 @@ jobs:
           else
             WORKER_URL="https://${{ steps.random.outputs.name }}-proxy.abesternheim.workers.dev"
           fi
-          echo "url=$WORKER_URL" >> $GITHUB_OUTPUT
+          echo "url=$WORKER_URL" >> "$GITHUB_OUTPUT"
           echo "Worker deployed at: $WORKER_URL"
 
       - name: Update daily URL file
