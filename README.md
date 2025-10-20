@@ -12,7 +12,9 @@ A Cloudflare Worker that proxies to forums.jtechforums.org with automatic domain
 
 ## Current URL
 
-Check the [CURRENT_URL.md](./CURRENT_URL.md) file for today's active URL.
+**Today's active URL:** [Check current URL](./CURRENT_URL.md)
+
+<!-- CURRENT_URL_MARKER -->
 
 ## Deployment
 
