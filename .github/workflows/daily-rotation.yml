@@ -26,10 +26,13 @@ jobs:
       - name: Generate random worker name
         id: random
         run: |
-          # Generate a random 8-character name
-          NEW_NAME=$(cat /dev/urandom | tr -dc 'a-z0-9' | fold -w 8 | head -n 1)
-          echo "name=$NEW_NAME" >> "$GITHUB_OUTPUT"
+          # Generate timestamp-based unique name
+          TIMESTAMP=$(date +%s)
+          NEW_NAME="${TIMESTAMP: -8}"
           echo "Generated worker name: $NEW_NAME"
+          {
+            echo "name=$NEW_NAME"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Update wrangler.toml with new name
         run: |
