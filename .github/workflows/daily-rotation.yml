@@ -23,32 +23,6 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Generate random worker name
-        id: random
-        run: |
-          # Generate timestamp-based unique name
-          TIMESTAMP=$(date +%s)
-          NEW_NAME="${TIMESTAMP: -8}"
-          echo "Generated worker name: $NEW_NAME"
-          {
-            echo "name=$NEW_NAME"
-          } >> "$GITHUB_OUTPUT"
-
-      - name: Update wrangler.toml with new name
-        run: |
-          sed -i "s/name = \".*\"/name = \"${{ steps.random.outputs.name }}-proxy\"/" wrangler.toml
-          echo "Updated wrangler.toml:"
-          cat wrangler.toml
-
-      - name: Install dependencies
-        run: npm install
-
-      - name: Authenticate with Cloudflare
-        run: |
-          npx wrangler auth login --api-token "${{ secrets.CLOUDFLARE_API_TOKEN }}"
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-
       - name: Get previous worker name
         id: previous
         run: |
@@ -61,7 +35,30 @@ jobs:
             echo "No previous worker found"
           fi
 
+      - name: Generate random worker name
+        id: random
+        run: |
+          # Generate timestamp-based unique name
+          TIMESTAMP=$(date +%s)
+          WORKER_NAME="${TIMESTAMP: -8}"
+          echo "Generated worker name: $WORKER_NAME"
+          {
+            echo "name=$WORKER_NAME"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Update wrangler.toml with new name
+        run: |
+          echo "Updating worker name to: ${{ steps.random.outputs.name }}-proxy"
+          sed -i "s/name = \".*\"/name = \"${{ steps.random.outputs.name }}-proxy\"/" wrangler.toml
+          echo "Updated wrangler.toml:"
+          cat wrangler.toml
+
+      - name: Install dependencies
+        run: npm install
+
       - name: Deploy new worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: npx wrangler deploy --compatibility-date 2024-01-01
 
       - name: Delete previous worker
