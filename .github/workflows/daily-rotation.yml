@@ -68,13 +68,12 @@ jobs:
           if [ -n "$OLD_WORKER" ] && [ "$OLD_WORKER" != "${{ steps.random.outputs.name }}" ]; then
             echo "Deleting old worker: $OLD_WORKER"
 
-            # Get the account ID from wrangler whoami output
+            # Get the account ID from wrangler whoami output (it's in a table format)
             WHOAMI_OUTPUT=$(npx wrangler whoami 2>&1)
-            echo "Wrangler whoami output:"
-            echo "$WHOAMI_OUTPUT"
+            echo "Extracting Account ID from wrangler output..."
 
-            # Extract account ID - it's in format "Account ID: <id>"
-            ACCOUNT_ID=$(echo "$WHOAMI_OUTPUT" | grep -oP "Account ID:\s*\K[a-f0-9]+")
+            # Extract account ID - it's a 32-character hex string in the table
+            ACCOUNT_ID=$(echo "$WHOAMI_OUTPUT" | grep -oE '[a-f0-9]{32}' | head -1)
 
             if [ -n "$ACCOUNT_ID" ]; then
               echo "Using Account ID: $ACCOUNT_ID"
@@ -98,6 +97,8 @@ jobs:
               fi
             else
               echo "Could not determine account ID from wrangler whoami, skipping deletion"
+              echo "Wrangler output was:"
+              echo "$WHOAMI_OUTPUT"
             fi
           else
             echo "No old worker to delete or same as new worker"
