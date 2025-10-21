@@ -1,4 +1,4 @@
-name = "61082510-proxy"
+name = "61082510"
 main = "worker.js"
 compatibility_date = "2024-01-01"
 
