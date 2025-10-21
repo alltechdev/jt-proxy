@@ -63,21 +63,43 @@ jobs:
 
       - name: Delete old worker
         run: |
-          # Delete the previous worker using wrangler delete with script name
+          # Delete the previous worker using Cloudflare API
           OLD_WORKER="${{ steps.old_worker.outputs.old_name }}"
           if [ -n "$OLD_WORKER" ] && [ "$OLD_WORKER" != "${{ steps.random.outputs.name }}" ]; then
             echo "Deleting old worker: $OLD_WORKER"
-            # Temporarily update wrangler.toml to the old worker name for deletion
-            cp wrangler.toml wrangler.toml.new
-            sed -i "s/name = .*/name = \"$OLD_WORKER\"/" wrangler.toml
-            if npx wrangler delete --force 2>&1; then
-              echo "Successfully deleted old worker: $OLD_WORKER"
-            else
-              echo "Warning: Failed to delete old worker: $OLD_WORKER"
-              echo "This is non-fatal, continuing..."
+
+            # First, get the account ID from wrangler
+            ACCOUNT_ID=$(npx wrangler whoami | grep "Account ID" | awk '{print $3}')
+
+            if [ -z "$ACCOUNT_ID" ]; then
+              echo "Could not determine account ID, trying alternative method..."
+              # Try to extract from wrangler config
+              ACCOUNT_ID=$(npx wrangler whoami 2>&1 | grep -oP "Account ID: \K\w+")
             fi
-            # Restore the new wrangler.toml
-            mv wrangler.toml.new wrangler.toml
+
+            if [ -n "$ACCOUNT_ID" ]; then
+              echo "Using Account ID: $ACCOUNT_ID"
+              # Use Cloudflare API to delete the worker
+              RESPONSE=$(curl -X DELETE \
+                "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/workers/scripts/$OLD_WORKER" \
+                -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+                -H "Content-Type: application/json" \
+                -w "\n%{http_code}" -s)
+
+              HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+              BODY=$(echo "$RESPONSE" | head -n-1)
+
+              if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "204" ]; then
+                echo "Successfully deleted old worker: $OLD_WORKER"
+              else
+                echo "Warning: Failed to delete old worker: $OLD_WORKER"
+                echo "HTTP Status: $HTTP_CODE"
+                echo "Response: $BODY"
+                echo "This is non-fatal, continuing..."
+              fi
+            else
+              echo "Could not determine account ID, skipping deletion"
+            fi
           else
             echo "No old worker to delete or same as new worker"
           fi
