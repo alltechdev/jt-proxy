@@ -43,10 +43,13 @@ jobs:
 
       - name: Deploy worker
         run: |
-          # Set API token
-          npx wrangler auth login --api-token "${{ secrets.CLOUDFLARE_API_TOKEN }}"
-          # Deploy
-          npx wrangler deploy
+          # Deploy using environment variable for authentication
+          echo "Deploying worker with name: ${{ steps.random.outputs.name }}-proxy"
+          if ! npx wrangler deploy; then
+            echo "Deployment failed"
+            exit 1
+          fi
+          echo "Deployment successful"
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
 
@@ -58,17 +61,49 @@ jobs:
           echo "**Today's URL:** $WORKER_URL" >> CURRENT_URL.md
           echo "**Deployed:** $(date -u)" >> CURRENT_URL.md
 
-          # Update README
-          sed -i '/## Current URL/,/<!-- CURRENT_URL_MARKER -->/c\
-          ## Current URL\
-          \
-          **Today's active URL:** ['"$WORKER_URL"']('"$WORKER_URL"')\
-          \
-          <!-- CURRENT_URL_MARKER -->' README.md
+          # Update README using Python for better reliability
+          python3 << 'EOF'
+          import re
+          import sys
+
+          try:
+              with open('README.md', 'r') as f:
+                  content = f.read()
+
+              # Find and replace the Current URL section
+              pattern = r'## Current URL.*?<!-- CURRENT_URL_MARKER -->'
+              replacement = f"""## Current URL
+
+**Today's active URL:** [{WORKER_URL}]({WORKER_URL})
+
+<!-- CURRENT_URL_MARKER -->"""
+
+              new_content = re.sub(pattern, replacement, content, flags=re.DOTALL)
+
+              with open('README.md', 'w') as f:
+                  f.write(new_content)
+
+              print("README.md updated successfully")
+          except Exception as e:
+              print(f"Error updating README.md: {e}")
+              sys.exit(1)
+          EOF
 
           # Commit and push
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git add wrangler.toml CURRENT_URL.md README.md
-          git commit -m "Daily rotation: ${{ steps.random.outputs.name }}-proxy" || echo "No changes to commit"
-          git push
+
+          # Check if there are changes to commit
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Daily rotation: ${{ steps.random.outputs.name }}-proxy"
+            echo "Changes committed successfully"
+
+            if ! git push; then
+              echo "Failed to push changes"
+              exit 1
+            fi
+            echo "Changes pushed successfully"
+          fi
