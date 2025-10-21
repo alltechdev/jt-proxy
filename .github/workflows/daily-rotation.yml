@@ -26,6 +26,14 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Get current worker name
+        id: old_worker
+        run: |
+          # Extract current worker name from wrangler.toml
+          OLD_NAME=$(grep '^name = ' wrangler.toml | sed 's/name = "\(.*\)"/\1/')
+          echo "old_name=$OLD_NAME" >> "$GITHUB_OUTPUT"
+          echo "Current worker name: $OLD_NAME"
+
       - name: Generate random worker name
         id: random
         run: |
@@ -50,6 +58,24 @@ jobs:
             exit 1
           fi
           echo "Deployment successful"
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+
+      - name: Delete old worker
+        run: |
+          # Delete the previous worker
+          OLD_WORKER="${{ steps.old_worker.outputs.old_name }}"
+          if [ -n "$OLD_WORKER" ] && [ "$OLD_WORKER" != "${{ steps.random.outputs.name }}-proxy" ]; then
+            echo "Deleting old worker: $OLD_WORKER"
+            if npx wrangler delete "$OLD_WORKER" --force; then
+              echo "Successfully deleted old worker: $OLD_WORKER"
+            else
+              echo "Warning: Failed to delete old worker: $OLD_WORKER"
+              echo "This is non-fatal, continuing..."
+            fi
+          else
+            echo "No old worker to delete or same as new worker"
+          fi
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
 
