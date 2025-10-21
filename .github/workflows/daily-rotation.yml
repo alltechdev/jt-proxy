@@ -62,7 +62,7 @@ jobs:
           echo "**Deployed:** $(date -u)" >> CURRENT_URL.md
 
           # Update README using Python for better reliability
-          python3 << 'EOF'
+          python3 << EOF
           import re
           import sys
 
