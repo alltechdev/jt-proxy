@@ -12,7 +12,7 @@ A Cloudflare Worker that proxies to forums.jtechforums.org with automatic domain
 
 ## Current URL
 
-**Today's active URL:** [Check current URL](./CURRENT_URL.md)
+**Today's active URL:** [61078543-proxy](https://61078543-proxy.abesternheim.workers.dev)
 
 <!-- CURRENT_URL_MARKER -->
 
