@@ -61,33 +61,8 @@ jobs:
           echo "**Today's URL:** $WORKER_URL" >> CURRENT_URL.md
           echo "**Deployed:** $(date -u)" >> CURRENT_URL.md
 
-          # Update README using Python for better reliability
-          python3 << EOF
-          import re
-          import sys
-
-          try:
-              with open('README.md', 'r') as f:
-                  content = f.read()
-
-              # Find and replace the Current URL section
-              pattern = r'## Current URL.*?<!-- CURRENT_URL_MARKER -->'
-              replacement = f"""## Current URL
-
-**Today's active URL:** [{WORKER_URL}]({WORKER_URL})
-
-<!-- CURRENT_URL_MARKER -->"""
-
-              new_content = re.sub(pattern, replacement, content, flags=re.DOTALL)
-
-              with open('README.md', 'w') as f:
-                  f.write(new_content)
-
-              print("README.md updated successfully")
-          except Exception as e:
-              print(f"Error updating README.md: {e}")
-              sys.exit(1)
-          EOF
+          # Update README using simple sed replacement
+          sed -i "s|\*\*Today's active URL:\*\*.*|\*\*Today's active URL:\*\* [${{ steps.random.outputs.name }}-proxy](https://${{ steps.random.outputs.name }}-proxy.abesternheim.workers.dev)|" README.md
 
           # Commit and push
           git config --local user.email "action@github.com"
