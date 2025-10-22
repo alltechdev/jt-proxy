@@ -2,7 +2,7 @@ name: Daily Worker Rotation
 
 on:
   schedule:
-    - cron: '0 0 * * *'  # Daily at midnight UTC
+    - cron: '5 0 * * *'  # Daily at 00:05 UTC (5 minutes after midnight to avoid delays)
   workflow_dispatch:  # Allow manual triggering
 
 jobs:
@@ -13,6 +13,12 @@ jobs:
       deployments: write
 
     steps:
+      - name: Log trigger time
+        run: |
+          echo "Workflow triggered at: $(date -u)"
+          echo "Scheduled time should be: 00:05 UTC"
+          echo "GitHub event: ${{ github.event_name }}"
+
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
